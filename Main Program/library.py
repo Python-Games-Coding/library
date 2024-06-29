@@ -3,8 +3,8 @@ from tkinter import messagebox, simpledialog, Listbox, END
 import os
 
 # 检查并创建配置文件夹和借阅书籍文件
-def check_and_create_config(base_folder):
-    config_folder = os.path.join(base_folder, "config")
+def check_and_create_config():
+    config_folder = "config"
     if not os.path.exists(config_folder):
         os.makedirs(config_folder)
     
@@ -13,6 +13,13 @@ def check_and_create_config(base_folder):
         with open(config_file, "w", encoding="utf-8") as file:
             file.write("")
     return config_file
+
+# 检查并创建书籍文件夹
+def check_and_create_books_folder():
+    books_folder = "books"
+    if not os.path.exists(books_folder):
+        os.makedirs(books_folder)
+    return books_folder
 
 # 读取借阅书籍列表
 def load_borrowed_books(config_file):
@@ -26,15 +33,15 @@ def save_borrowed_books(config_file, books):
         file.write("\n".join(books))
 
 # 初始化配置和全局变量
-base_folder = "C:/Users/Windows12.2Pro/Desktop/github project/library"  # 替换为你希望的绝对路径
-config_file = check_and_create_config(base_folder)
+config_file = check_and_create_config()
+books_folder = check_and_create_books_folder()
 borrowed_books = load_borrowed_books(config_file)
 current_language = "en"  # 默认语言为英语
 
 # 文本字典
 texts = {
     "en": {
-        "library_system": "Library System",  # 添加这行
+        "library_system": "Library System",
         "borrow_book": "Borrow Book",
         "return_book": "Return Book",
         "view_account": "View Account",
@@ -67,7 +74,7 @@ texts = {
         "change_language": "Change Language"
     },
     "zh": {
-        "library_system": "图书管理系统",  # 添加这行
+        "library_system": "图书管理系统",
         "borrow_book": "借书",
         "return_book": "还书",
         "view_account": "查看账户",
@@ -125,7 +132,7 @@ def borrow_book():
             messagebox.showerror(texts[current_language]["error"], texts[current_language]["enter_book_name"])
             return
         
-        book_path = f"books/{book_name}"
+        book_path = os.path.join(books_folder, book_name)
         if not os.path.exists(book_path):
             response = messagebox.askyesno(texts[current_language]["error"], texts[current_language]["create_book_prompt"])
             if response:
@@ -190,7 +197,6 @@ def view_account():
     tk.Button(window, text=texts[current_language]["exit"], font=("Arial", 20), height=2, width=10, command=window.destroy).pack(pady=10)
 
 # 新建书籍功能
-
 def create_book():
     book_name = None
     total_pages = 0
@@ -202,10 +208,6 @@ def create_book():
         if not book_name:
             messagebox.showerror(texts[current_language]["error"], texts[current_language]["enter_book_name"])
             return
-        
-        # Check if the books directory exists, create it if it doesn't
-        if not os.path.exists("books"):
-            os.makedirs("books")
         
         window.destroy()
         step2()
@@ -239,29 +241,21 @@ def create_book():
         tk.Button(frame, text=texts[current_language]["cancel"], font=("Arial", 20), height=2, width=10, command=window.destroy).pack(side="left", padx=5)
         tk.Button(frame, text=texts[current_language]["next"], font=("Arial", 20), height=2, width=10, command=next_step).pack(side="right", padx=5)
     
-    def step3(page):
-        if page > total_pages:
-            # Ensure 'books/' directory exists before attempting to write
-            if not os.path.exists("books"):
-                os.makedirs("books")
-            
-            with open(f"books/{book_name}", "w", encoding="utf-8") as file:
-                for content in pages_content:
-                    file.write(content + "\n")
-            
-            messagebox.showinfo(texts[current_language]["success_create"], texts[current_language]["success_create"])
+    def step3(page_num):
+        if page_num > total_pages:
+            complete()
             return
         
         def next_step():
-            pages_content.append(entry.get())
+            pages_content.append(entry.get("1.0", END).strip())
             window.destroy()
-            step3(page + 1)
+            step3(page_num + 1)
         
         window = tk.Toplevel(root)
-        window.title(texts[current_language]["create_book"])
+        window.title(f"{texts[current_language]['create_book']} - {texts[current_language]['step3']}{page_num}页")
         
-        tk.Label(window, text=f"{texts[current_language]['step3']}{page}/{total_pages}页：", font=("Arial", 20)).pack(pady=10)
-        entry = tk.Entry(window, font=("Arial", 20))
+        tk.Label(window, text=f"{texts[current_language]['step3']}{page_num}页", font=("Arial", 20)).pack(pady=10)
+        entry = tk.Text(window, font=("Arial", 20), height=10, width=50)
         entry.pack(pady=5)
         
         frame = tk.Frame(window)
@@ -269,6 +263,12 @@ def create_book():
         
         tk.Button(frame, text=texts[current_language]["cancel"], font=("Arial", 20), height=2, width=10, command=window.destroy).pack(side="left", padx=5)
         tk.Button(frame, text=texts[current_language]["next"], font=("Arial", 20), height=2, width=10, command=next_step).pack(side="right", padx=5)
+    
+    def complete():
+        book_path = os.path.join(books_folder, book_name)
+        with open(book_path, "w", encoding="utf-8") as file:
+            file.write("\n".join(pages_content))
+        messagebox.showinfo(texts[current_language]["success_create"], f"{texts[current_language]['success_create']}《{book_name}》")
     
     window = tk.Toplevel(root)
     window.title(texts[current_language]["create_book"])
@@ -291,56 +291,53 @@ def read_book():
             messagebox.showerror(texts[current_language]["error"], texts[current_language]["enter_book_name"])
             return
         
-        book_path = f"books/{book_name}"
+        book_path = os.path.join(books_folder, book_name)
         if not os.path.exists(book_path):
-            response = messagebox.askyesno(texts[current_language]["error"], texts[current_language]["borrow_prompt"])
+            response = messagebox.askyesno(texts[current_language]["error"], texts[current_language]["create_book_prompt"])
             if response:
-                borrow_book()
+                create_book()
             return
         
         if book_name not in borrowed_books:
             response = messagebox.askyesno(texts[current_language]["error"], texts[current_language]["borrow_prompt"])
             if response:
-                borrow_book()
-            return
+                borrowed_books.append(book_name)
+                save_borrowed_books(config_file, borrowed_books)
+        
+        with open(book_path, "r", encoding="utf-8") as file:
+            pages = file.read().split("\n")
         
         window.destroy()
-        step2(book_name)
+        step2(pages, 0)
     
-    def step2(book_name):
-        with open(f"books/{book_name}", "r", encoding="utf-8") as file:
-            pages = file.read().splitlines()
-        
-        current_page = 0
-        
-        def show_page():
-            text.delete(1.0, END)
-            text.insert(END, pages[current_page])
-        
+    def step2(pages, page_num):
         def next_page():
-            nonlocal current_page
-            if current_page < len(pages) - 1:
-                current_page += 1
-                show_page()
+            window.destroy()
+            step2(pages, page_num + 1)
         
-        def previous_page():
-            nonlocal current_page
-            if current_page > 0:
-                current_page -= 1
-                show_page()
+        def prev_page():
+            window.destroy()
+            step2(pages, page_num - 1)
         
         window = tk.Toplevel(root)
-        window.title(texts[current_language]["read_book"])
+        window.title(f"{texts[current_language]['read_book']} - {texts[current_language]['step3']}{page_num + 1}页")
         
-        text = tk.Text(window, font=("Arial", 20), wrap="word")
-        text.pack(expand=True, fill="both", pady=10)
-        show_page()
+        tk.Label(window, text=f"{texts[current_language]['step3']}{page_num + 1}页", font=("Arial", 20)).pack(pady=10)
+        text = tk.Text(window, font=("Arial", 20), height=10, width=50)
+        text.pack(pady=5)
+        text.insert(END, pages[page_num])
+        text.config(state="disabled")
         
         frame = tk.Frame(window)
         frame.pack(pady=10)
         
-        tk.Button(frame, text=texts[current_language]["previous"], font=("Arial", 20), height=2, width=10, command=previous_page).pack(side="left", padx=5)
-        tk.Button(frame, text=texts[current_language]["next"], font=("Arial", 20), height=2, width=10, command=next_page).pack(side="right", padx=5)
+        if page_num > 0:
+            tk.Button(frame, text=texts[current_language]["previous"], font=("Arial", 20), height=2, width=10, command=prev_page).pack(side="left", padx=5)
+        
+        if page_num < len(pages) - 1:
+            tk.Button(frame, text=texts[current_language]["next"], font=("Arial", 20), height=2, width=10, command=next_page).pack(side="right", padx=5)
+        else:
+            tk.Button(frame, text=texts[current_language]["complete"], font=("Arial", 20), height=2, width=10, command=window.destroy).pack(side="right", padx=5)
     
     window = tk.Toplevel(root)
     window.title(texts[current_language]["read_book"])
@@ -355,32 +352,29 @@ def read_book():
     tk.Button(frame, text=texts[current_language]["cancel"], font=("Arial", 20), height=2, width=10, command=window.destroy).pack(side="left", padx=5)
     tk.Button(frame, text=texts[current_language]["next"], font=("Arial", 20), height=2, width=10, command=step1).pack(side="right", padx=5)
 
-# 退出系统功能
-def exit_system():
-    root.destroy()
-
-# 初始化主界面
+# 主界面
 root = tk.Tk()
 root.title(texts[current_language]["library_system"])
 
-borrow_button = tk.Button(root, text=texts[current_language]["borrow_book"], font=("Arial", 20), height=2, width=15, command=borrow_book)
+borrow_button = tk.Button(root, text=texts[current_language]["borrow_book"], font=("Arial", 20), height=2, width=20, command=borrow_book)
 borrow_button.pack(pady=10)
 
-return_button = tk.Button(root, text=texts[current_language]["return_book"], font=("Arial", 20), height=2, width=15, command=return_book)
+return_button = tk.Button(root, text=texts[current_language]["return_book"], font=("Arial", 20), height=2, width=20, command=return_book)
 return_button.pack(pady=10)
 
-view_button = tk.Button(root, text=texts[current_language]["view_account"], font=("Arial", 20), height=2, width=15, command=view_account)
+view_button = tk.Button(root, text=texts[current_language]["view_account"], font=("Arial", 20), height=2, width=20, command=view_account)
 view_button.pack(pady=10)
 
-read_button = tk.Button(root, text=texts[current_language]["read_book"], font=("Arial", 20), height=2, width=15, command=read_book)
-read_button.pack(pady=10)
-
-create_button = tk.Button(root, text=texts[current_language]["create_book"], font=("Arial", 20), height=2, width=15, command=create_book)
+create_button = tk.Button(root, text=texts[current_language]["create_book"], font=("Arial", 20), height=2, width=20, command=create_book)
 create_button.pack(pady=10)
 
-lang_button = tk.Button(root, text=texts[current_language]["change_language"], font=("Arial", 20), height=2, width=15, command=switch_language)
+read_button = tk.Button(root, text=texts[current_language]["read_book"], font=("Arial", 20), height=2, width=20, command=read_book)
+read_button.pack(pady=10)
+
+lang_button = tk.Button(root, text=texts[current_language]["change_language"], font=("Arial", 20), height=2, width=20, command=switch_language)
 lang_button.pack(pady=10)
 
-exit_button = tk.Button(root, text=texts[current_language]["exit"], font=("Arial", 20), height=2, width=15, command=exit_system)
+exit_button = tk.Button(root, text=texts[current_language]["exit"], font=("Arial", 20), height=2, width=20, command=root.quit)
 exit_button.pack(pady=10)
+
 root.mainloop()
